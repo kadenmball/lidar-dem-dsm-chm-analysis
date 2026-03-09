@@ -1,0 +1,60 @@
+---
+title: "LiDAR Processing Workflow"
+author: "Kaden Ball"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Required Libraries
+
+```{r}
+# install.packages(c("lidR", "terra", "sf"))
+library(lidR)
+library(terra)
+library(sf)
+```
+
+## Load and Process LiDAR Data
+
+```{r}
+las <- readLAS("data/export/Arboretum-10232024.las")
+
+# Classify ground using csf() for robust terrain
+las <- classify_ground(las, csf())
+```
+
+## Create DEM with Reliable Interpolation
+
+```{r}
+# Use knnidw for DEM generation to reduce empty areas
+dem <- rasterize_terrain(las, res = 1, algorithm = knnidw(k = 10, p = 2))
+
+writeRaster(dem, "DEM.tif", overwrite=TRUE)
+```
+
+## Normalize Heights and Create DSM + CHM
+
+```{r}
+# Normalize point cloud to ground
+las_norm <- normalize_height(las, dem)
+
+# Digital Surface Model from first returns
+dsm <- rasterize_canopy(las, res = 1, algorithm = p2r())
+
+# Canopy Height Model from normalized points
+chm <- rasterize_canopy(las_norm, res = 1, algorithm = p2r())
+
+writeRaster(dsm, "DSM.tif", overwrite=TRUE)
+writeRaster(chm, "CHM.tif", overwrite=TRUE)
+```
+
+## Visualizations
+
+```{r}
+plot(dem, main="Digital Elevation Model")
+plot(dsm, main="Digital Surface Model")
+plot(chm, main="Canopy Height Model")
+```
